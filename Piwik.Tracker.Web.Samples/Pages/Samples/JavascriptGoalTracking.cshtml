@@ -1,0 +1,28 @@
+﻿@page
+@model JavascriptGoalTrackingModel
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "JavascriptGoalTracking";
+}
+
+This page tracks a goal conversion with the Javascript API. <br /><br />
+
+<br />
+
+<a href="../Index">Back</a>
+
+<!-- Piwik -->
+<script type="text/javascript">
+    var _paq = _paq || [];
+    _paq.push(['setReferrerUrl', 'http://supernovarep.org']);
+    _paq.push(['trackGoal', 1]);
+    (function () {
+        var u = "@{ @Html.Raw(Configuration.GetSection("PiwikConfig")["PiwikURL"]); }/";
+        _paq.push(['setTrackerUrl', u + 'piwik.php']);
+        _paq.push(['setSiteId', @{ @Html.Raw(Configuration.GetSection("PiwikConfig")["SiteId"]); }]);
+        var d = document, g = d.createElement('script'), s = d.getElementsByTagName('script')[0];
+        g.type = 'text/javascript'; g.async = true; g.defer = true; g.src = u + 'piwik.js'; s.parentNode.insertBefore(g, s);
+    })();
+</script>
+<!-- End Piwik Code -->

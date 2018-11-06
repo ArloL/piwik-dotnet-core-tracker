@@ -1,0 +1,23 @@
+﻿@page
+@model ServerSideDeleteCookiesModel
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "ServerSideDeleteCookies";
+}
+
+This page deletes all first party Piwik cookies using the Server Side Tracking API.
+<br />
+<br />
+
+@{
+    var PiwikBaseUrl = Configuration.GetSection("PiwikConfig")["PiwikURL"];
+    var piwikTracker = new PiwikTracker(1, PiwikBaseUrl, HttpContext);
+    piwikTracker.DeleteCookies();
+}
+
+<br />
+
+<br />
+
+<a href="../Index">Back</a>

@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Net.Http;
 using System.Web;
-using System.Web.Script.Serialization;
+using Microsoft.AspNetCore.WebUtilities;
 using Newtonsoft.Json;
 using NUnit.Framework;
 
@@ -381,7 +381,7 @@ namespace Piwik.Tracker.Tests
             {
                 { "",new object[] {sku, name, categoryList, price.ToString("0.##", CultureInfo.InvariantCulture), quantity}}
             };
-            var expectedAsJson = new JavaScriptSerializer().Serialize(expected.Values);
+            var expectedAsJson = JsonConvert.SerializeObject(expected.Values);
             Console.WriteLine(expectedAsJson);
             Assert.That(actual, Does.Contain("&ec_items=" + HttpUtility.UrlEncode(expectedAsJson)));
         }
@@ -402,7 +402,7 @@ namespace Piwik.Tracker.Tests
             _sut.SetEcommerceView(sku, name, categoryList, price);
             var actualRequest = _sut.GetRequest(SiteId);
             // Assert
-            var actualRequestArguments = new Uri(actualRequest).ParseQueryString().ToKeyValuePairs().ToDictionary(kvp => kvp.Key, kvp => kvp.Value);
+            var actualRequestArguments = QueryHelpers.ParseQuery(new Uri(actualRequest).Query);
             var actualVariablesById = JsonConvert.DeserializeObject<Dictionary<int, object>>(actualRequestArguments["cvar"]);
             Assert.That(actualVariablesById.Count, Is.EqualTo(4));
             foreach (var variableById in actualVariablesById)
@@ -424,7 +424,7 @@ namespace Piwik.Tracker.Tests
                         {
                             continue;
                         }
-                        Assert.That(variableValue, Is.EquivalentTo(new[] { "_pkc", new JavaScriptSerializer().Serialize(categoryList) }));
+                        Assert.That(variableValue, Is.EquivalentTo(new[] { "_pkc", JsonConvert.SerializeObject(categoryList) }));
                         break;
 
                     case PiwikTracker.CvarIndexEcommerceItemSku:

@@ -11,7 +11,7 @@
 
 ## How-to
 
-1. [Validate tests](https://travis-ci.org/piwik/piwik-dotnet-tracker)
+1. [Validate tests](https://travis-ci.org/piwik/piwik-dotnetcore-tracker)
 1. `./publish.sh`
 1. `./generate-changelog.sh`
 1. close github milestone

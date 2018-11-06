@@ -9,7 +9,12 @@ using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using NUnit.Framework;
-using SimpleHttpMock;
+using WireMock.Logging;
+using WireMock.Matchers;
+using WireMock.RequestBuilders;
+using WireMock.ResponseBuilders;
+using WireMock.Server;
+using WireMock.Settings;
 
 namespace Piwik.Tracker.Tests
 {
@@ -17,9 +22,9 @@ namespace Piwik.Tracker.Tests
     internal class PiwikTrackerWithMockedServerTests
     {
         private PiwikTracker _sut;
-        private MockedHttpServer _mockedPiwikServer;
+        private FluentMockServer _mockedPiwikServer;
         private const string UA = "Firefox";
-        private const string PiwikBaseUrl = "http://127.0.0.1:1122/piwik.php";
+        private const string PiwikBaseUrl = "http://localhost:1122/";
         private const int SiteId = 1;
 
         private static readonly NameValueCollection DefaultRequestParameter = new NameValueCollection
@@ -39,19 +44,33 @@ namespace Piwik.Tracker.Tests
         [OneTimeSetUp]
         public void SetUpFixture()
         {
-            _mockedPiwikServer = new MockedHttpServer(PiwikBaseUrl);
+            _mockedPiwikServer = FluentMockServer.Start(new FluentMockServerSettings
+            {
+                Urls = new[] { PiwikBaseUrl },
+                StartAdminInterface = true,
+                ReadStaticMappings = true,
+                WatchStaticMappings = true,
+                PreWireMockMiddlewareInit = app => { System.Console.WriteLine($"PreWireMockMiddlewareInit : {app.GetType()}"); },
+                PostWireMockMiddlewareInit = app => { System.Console.WriteLine($"PostWireMockMiddlewareInit : {app.GetType()}"); },
+                Logger = new WireMockConsoleLogger(),
+            });
+
+            _mockedPiwikServer.AllowPartialMapping();
+
+            this.CreateAllGetOkRequestBehavior();
+            this.CreateAllPostOkRequestBehavior();
         }
 
         [OneTimeTearDown]
         public void TearDownFixture()
         {
-            _mockedPiwikServer.Dispose();
+            _mockedPiwikServer.Stop();
         }
 
         [SetUp]
         public void SetUpTest()
         {
-            _sut = new PiwikTracker(SiteId, PiwikBaseUrl);
+            _sut = new PiwikTracker(SiteId, PiwikBaseUrl + "piwik.php");
         }
 
         [Test]
@@ -60,13 +79,12 @@ namespace Piwik.Tracker.Tests
         public void DoTrackPageView_Test(string documentTitle)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             //Act
             var actual = _sut.DoTrackPageView(documentTitle);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             Assert.PiwikRequestParameterMatch(actualRequest, new NameValueCollection
             {
                 { "_idvc", "0" },// visit count
@@ -82,7 +100,6 @@ namespace Piwik.Tracker.Tests
         public void DoTrackEvent_Test(string category, string action, string name, string value)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             var expectedParameter = new NameValueCollection
             {
                 {"_idvc", "0"}, // visit count
@@ -93,9 +110,9 @@ namespace Piwik.Tracker.Tests
             //Act
             var actual = _sut.DoTrackEvent(category, action, name, value);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             if (!string.IsNullOrEmpty(name))
             {
                 expectedParameter.Add("e_n", name);
@@ -115,7 +132,6 @@ namespace Piwik.Tracker.Tests
         public void DoTrackContentImpression_Test(string contentName, string contentPiece, string contentTarget)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             var expectedParameter = new NameValueCollection
             {
                 {"_idvc", "0"}, // visit count
@@ -125,9 +141,9 @@ namespace Piwik.Tracker.Tests
             //Act
             var actual = _sut.DoTrackContentImpression(contentName, contentPiece, contentTarget);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             if (!string.IsNullOrEmpty(contentPiece))
             {
                 expectedParameter.Add("c_p", contentPiece);
@@ -147,20 +163,19 @@ namespace Piwik.Tracker.Tests
         public void DoTrackContentInteraction_Test(string interaction, string contentName, string contentPiece, string contentTarget)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             var expectedParameter = new NameValueCollection
             {
                  { "_idvc", "0" },// visit count
-                    { "_id", _sut.GetVisitorId() }, // visitor id
-                    { "c_n", contentName },
-                    { "c_i", interaction },
+                 { "_id", _sut.GetVisitorId() }, // visitor id
+                 { "c_n", contentName },
+                 { "c_i", interaction },
             };
             //Act
             var actual = _sut.DoTrackContentInteraction(interaction, contentName, contentPiece, contentTarget);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             if (!string.IsNullOrEmpty(contentPiece))
             {
                 expectedParameter.Add("c_p", contentPiece);
@@ -180,7 +195,6 @@ namespace Piwik.Tracker.Tests
         public void DoTrackSiteSearch_Test(string keyword, string category, int? countResults)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             var expectedParameter = new NameValueCollection
             {
                  { "_idvc", "0" },// visit count
@@ -190,9 +204,9 @@ namespace Piwik.Tracker.Tests
             //Act
             var actual = _sut.DoTrackSiteSearch(keyword, category, countResults);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             if (!string.IsNullOrEmpty(category))
             {
                 expectedParameter.Add("search_cat", category);
@@ -212,7 +226,6 @@ namespace Piwik.Tracker.Tests
         public void DoTrackGoal_Test(int idGoal, float revenue)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             var expectedParameter = new NameValueCollection
             {
                  { "_idvc", "0" },// visit count
@@ -222,9 +235,9 @@ namespace Piwik.Tracker.Tests
             //Act
             var actual = _sut.DoTrackGoal(idGoal, revenue);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
             if (Math.Abs(revenue) > 0.05f)
             {
                 expectedParameter.Add("revenue", revenue.ToString("0.##", CultureInfo.InvariantCulture));
@@ -238,13 +251,12 @@ namespace Piwik.Tracker.Tests
         public void DoTrackAction_Test(string actionUrl, ActionType actionType)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             //Act
             var actual = _sut.DoTrackAction(actionUrl, actionType);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
 
             Assert.PiwikRequestParameterMatch(actualRequest, new NameValueCollection
             {
@@ -260,13 +272,12 @@ namespace Piwik.Tracker.Tests
         public void DoTrackEcommerceCartUpdate_Test(double grandTotal)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             //Act
             var actual = _sut.DoTrackEcommerceCartUpdate(grandTotal);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
 
             Assert.PiwikRequestParameterMatch(actualRequest, new NameValueCollection
                 {
@@ -283,7 +294,6 @@ namespace Piwik.Tracker.Tests
         public async Task DoBulkTrack_Test(string token)
         {
             //Arrange
-            var retrieveRequest = CreateAllPostOkRequestBehavior();
             var language = "en-gb";
             var numberOfRequests = 20;
             //Act
@@ -303,19 +313,20 @@ namespace Piwik.Tracker.Tests
             var actual = _sut.DoBulkTrack();
             Assert.That(_sut.GetStoredTrackingActions().Length, Is.EqualTo(0));
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("POST"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("POST"));
+
             if (string.IsNullOrEmpty(token))
             {
-                var body = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(actualRequest.RequestBody.ToString()) as Dictionary<string, string[]>;
+                var body = JsonConvert.DeserializeObject<Dictionary<string, string[]>>(actualRequest.RequestMessage.BodyData.BodyAsString) as Dictionary<string, string[]>;
                 Assert.That(body.Keys.Count, Is.EqualTo(1));
                 Assert.That(body.Keys.First(), Is.EqualTo("requests"));
                 Assert.That(body.First().Value, Is.EquivalentTo(expectedUrls));
             }
             else
             {
-                var body = JsonConvert.DeserializeObject<Dictionary<string, object>>(actualRequest.RequestBody.ToString()) as Dictionary<string, object>;
+                var body = JsonConvert.DeserializeObject<Dictionary<string, object>>(actualRequest.RequestMessage.BodyData.BodyAsString) as Dictionary<string, object>;
                 Assert.That(body.Keys.Count, Is.EqualTo(2));
                 Assert.That(body["token_auth"], Is.EqualTo(token));
                 Assert.That(((JArray)body["requests"]).Select(item => (string)item).ToArray(), Is.EquivalentTo(expectedUrls));
@@ -327,13 +338,12 @@ namespace Piwik.Tracker.Tests
         public void DoTrackEcommerceOrder_Test(string orderId, double grandTotal, double subTotal, double tax, double shipping, double discount)
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             //Act
             var actual = _sut.DoTrackEcommerceOrder(orderId, grandTotal, subTotal, tax, shipping, discount);
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
 
             Assert.PiwikRequestParameterMatch(actualRequest, new NameValueCollection
                 {
@@ -353,13 +363,12 @@ namespace Piwik.Tracker.Tests
         public void DoPing_Test()
         {
             //Arrange
-            var retrieveRequest = CreateAllGetOkRequestBehavior();
             //Act
             var actual = _sut.DoPing();
             //Assert
-            var actualRequest = retrieveRequest();
+            var actualRequest = this._mockedPiwikServer.LogEntries.Last();
             Assert.That(actual.HttpStatusCode, Is.EqualTo(HttpStatusCode.OK));
-            Assert.That(actualRequest.Method, Is.EqualTo("GET"));
+            Assert.That(actualRequest.RequestMessage.Method, Is.EqualTo("GET"));
 
             Assert.PiwikRequestParameterMatch(actualRequest, new NameValueCollection
                 {
@@ -369,34 +378,51 @@ namespace Piwik.Tracker.Tests
                 });
         }
 
-        private Func<ActualRequest> CreateAllGetOkRequestBehavior()
+        private void CreateAllGetOkRequestBehavior()
         {
-            var builder = new MockedHttpServerBuilder();
-            var retrieveRequest = builder
-                .WhenGet(Matchers.Regex(".*")).Respond(HttpStatusCode.OK)
-                .Retrieve();
-            builder.Build(_mockedPiwikServer);
-            return retrieveRequest;
+            this._mockedPiwikServer
+                .Given(Request.Create()
+                    .UsingGet()
+                    .WithPath(new WildcardMatcher("*", true))
+                )
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                );
         }
 
-        private Func<ActualRequest> CreateAllPostOkRequestBehavior()
+        private void CreateAllPostOkRequestBehavior()
         {
-            var builder = new MockedHttpServerBuilder();
-            var retrieveRequest = builder
-                .WhenPost(Matchers.Regex(".*")).Respond(HttpStatusCode.OK)
-                .Retrieve();
-            builder.Build(_mockedPiwikServer);
-            return retrieveRequest;
+            this._mockedPiwikServer
+                .Given(Request.Create()
+                    .UsingPost()
+                    .WithPath(new WildcardMatcher("*", true))
+                )
+                .RespondWith(Response.Create()
+                    .WithStatusCode(200)
+                );
         }
 
         internal class Assert : NUnit.Framework.Assert
         {
-            public static void PiwikRequestParameterMatch(ActualRequest actualRequest, NameValueCollection additionalExpectedParameter)
+            public static void PiwikRequestParameterMatch(LogEntry actualRequest, NameValueCollection additionalExpectedParameter)
             {
-                Assert.That(actualRequest.RequestUri.GetAuthorityAndPath(), Is.EqualTo(PiwikBaseUrl));
-                var actualRequestParameter = actualRequest.RequestUri.ParseQueryString();
+                var baseUrl = actualRequest.RequestMessage.Protocol + "://" + actualRequest.RequestMessage.Host + ":" + actualRequest.RequestMessage.Port + "/";
+                Assert.That(baseUrl, Is.EqualTo(PiwikBaseUrl));
+
+                var queryStringPos = actualRequest.RequestMessage.AbsoluteUrl.IndexOf("?");
+                string queryString;
+
+                if (queryStringPos < 0)
+                {
+                    queryString = "";
+                } else
+                {
+                    queryString = actualRequest.RequestMessage.AbsoluteUrl.Substring(queryStringPos);
+                }
+
+                var actualRequestParameter = System.Web.HttpUtility.ParseQueryString(queryString);
                 var expectedRequestParameter = new NameValueCollection(DefaultRequestParameter) { additionalExpectedParameter };
-                Assert.That(actualRequestParameter.AllKeys, Is.SupersetOf(DefaultRequestParameterKeysToRemoveFromComparison),
+                Assert.That(actualRequestParameter.Keys, Is.SupersetOf(DefaultRequestParameterKeysToRemoveFromComparison),
                     $"Request parameters must at least contain default Keys {string.Join(",", DefaultRequestParameterKeysToRemoveFromComparison)}.");
 
                 // remove random default values!

@@ -1,0 +1,42 @@
+﻿@page
+@model AttributionInfoServerReadModel
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "AttributionInfoServerRead";
+}
+
+This page displays the result of the getAttributionInfo() method.
+<br />
+<br />
+
+If a tracking request has been sent via javascript, this method will output the content of the piwik ref cookie.
+<br />
+<br />
+
+@{
+    var PiwikBaseUrl = Configuration.GetSection("PiwikConfig")["PiwikURL"];
+    var piwikTracker = new PiwikTracker(1, PiwikBaseUrl, HttpContext);
+    piwikTracker.EnableCookies();
+
+    var attributionInfo = piwikTracker.GetAttributionInfo();
+
+    if (attributionInfo == null)
+    {
+        @Html.Raw("No attribution information to read from cookies");
+    }
+    else
+    {
+        @Html.Raw("campaignName : " + attributionInfo.CampaignName + "<br>");
+        @Html.Raw("campaignKeywork : " + attributionInfo.CampaignKeyword + "<br>");
+        @Html.Raw("referrerTimestamp : " + attributionInfo.ReferrerTimestamp + "<br>");
+        @Html.Raw("referrerUrl : " + attributionInfo.ReferrerUrl + "<br>");
+    }
+
+}
+
+<br />
+
+<br />
+
+<a href="../Index">Back</a>

@@ -1,0 +1,49 @@
+﻿@page
+@model VisitScopedCustomVariableServerReadModel
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "VisitScopedCustomVariableServerRead";
+}
+
+This page displays visit scoped custom variables (index 1 & 2) using the Server Side Tracking API.
+<br />
+<br />
+
+@{
+    var PiwikBaseUrl = Configuration.GetSection("PiwikConfig")["PiwikURL"];
+    var piwikTracker = new PiwikTracker(1, PiwikBaseUrl, HttpContext);
+    piwikTracker.EnableCookies();
+
+    var customVar1 = piwikTracker.GetCustomVariable(1);
+    var customVar2 = piwikTracker.GetCustomVariable(2);
+
+    if (customVar1 != null)
+    {
+        @Html.Raw("Custom var index 1, name = " + customVar1.Name + "<br />");
+        @Html.Raw("Custom var index 1, value = " + customVar1.Value + "<br />");
+    }
+    else
+    {
+        @Html.Raw("No custom var on index 1 <br />");
+    }
+
+    @Html.Raw("<br />");
+
+    if (customVar2 != null)
+    {
+        @Html.Raw("Custom var index 2, name = " + customVar2.Name + "<br />");
+        @Html.Raw("Custom var index 2, value = " + customVar2.Value + "<br />");
+    }
+    else
+    {
+        @Html.Raw("No custom var on index 2 <br />");
+    }
+
+}
+
+<br />
+
+<br />
+
+<a href="../Index">Back</a>

@@ -1,0 +1,40 @@
+﻿@page
+@model ServerSideGoalTrackingModel
+@using Microsoft.Extensions.Configuration
+@inject IConfiguration Configuration
+@{
+    ViewData["Title"] = "ServerSideGoalTracking";
+}
+
+
+This page tracks a goal conversion with the Server Side tracking API and displays the response.
+<br />
+<br />
+
+@{
+    var PiwikBaseUrl = Configuration.GetSection("PiwikConfig")["PiwikURL"];
+
+    var piwikTracker = new PiwikTracker(1, PiwikBaseUrl, HttpContext);
+    piwikTracker.EnableCookies();
+
+    var attributionInfo = new AttributionInfo();
+
+    attributionInfo.CampaignName = "CAMPAIGN NAME";
+    attributionInfo.CampaignKeyword = "CAMPAIGN KEYWORD";
+    attributionInfo.ReferrerTimestamp = new DateTime(2011, 04, 08, 23, 48, 24, DateTimeKind.Utc);
+    attributionInfo.ReferrerUrl = "http://www.example.org/test/really?q=yes";
+
+    piwikTracker.SetAttributionInfo(attributionInfo);
+
+    piwikTracker.SetCustomVariable(1, "custom-variable1", "custom-variable1-value");
+
+    var response = piwikTracker.DoTrackGoal(1, 42.69F);
+
+    @Html.Raw(response.HttpStatusCode);
+}
+
+<br />
+
+<br />
+
+<a href="../Index">Back</a>
