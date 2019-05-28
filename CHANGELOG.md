@@ -1,5 +1,15 @@
 # Change Log
 
+## [3.0.2](https://github.com/MichaelHeerklotz/piwik-dotnet-core-tracker/tree/3.0.2) (2019-05-28)
+[Full Changelog](https://github.com/MichaelHeerklotz/piwik-dotnet-core-tracker/compare/3.0.1...3.0.2)
+
+- Unlinked userId and visitorId logic (https://github.com/matomo-org/matomo/pull/14360)
+
+## [3.0.1](https://github.com/MichaelHeerklotz/piwik-dotnet-core-tracker/tree/3.0.1) (2018-11-06)
+[Full Changelog](https://github.com/MichaelHeerklotz/piwik-dotnet-core-tracker/compare/3.0.0...3.0.1)
+
+- Ported to .Net Core 2.1
+
 ## [3.0.0](https://github.com/piwik/piwik-dotnet-tracker/tree/3.0.0) (2017-05-09)
 [Full Changelog](https://github.com/piwik/piwik-dotnet-tracker/compare/2.16.0...3.0.0)
 
