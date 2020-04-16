@@ -1,0 +1,15 @@
+name: dotnet
+
+on: [push]
+jobs:
+  dotnet:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v1
+    - name: Build with Maven
+      run: |
+        dotnet pack --configuration Release --include-symbols --include-source
+    - uses: actions/upload-artifact@v1
+      with:
+        name: nuget package
+        path: Piwik.Tracker/bin/Release
